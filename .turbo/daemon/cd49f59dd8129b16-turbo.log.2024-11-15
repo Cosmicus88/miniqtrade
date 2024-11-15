@@ -512,3 +512,5 @@
 2024-11-15T17:27:07.012197Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("apps/client/vite.config.ts.timestamp-1731691626961-84426ce4e573c.mjs")}
 2024-11-15T17:27:07.012216Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("miniqtrade-client"), path: AnchoredSystemPathBuf("apps/client") }: FileChanged { file: AnchoredSystemPathBuf("apps/client/vite.config.ts.timestamp-1731691626961-84426ce4e573c.mjs") }}))
 2024-11-15T17:27:07.073549Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2024-11-15T17:30:50.305644Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("apps/server/specs")}
+2024-11-15T17:30:50.305668Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("miniqtrade-server"), path: AnchoredSystemPathBuf("apps/server") }: FileChanged { file: AnchoredSystemPathBuf("apps/server/specs") }}))

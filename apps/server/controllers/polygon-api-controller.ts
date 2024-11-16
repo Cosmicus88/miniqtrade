@@ -1,29 +1,74 @@
-import {
-  Request as ExpressRequest,
-  Response as ExpressResponse,
-} from "express";
-import { getStockData } from "../utils/polygon-api";
+import { NextFunction, Request, Response } from "express";
+import { getTickersBySicCode } from "../utils/poly-related-api";
 
-export const getAPIdataController = async (
-  req: ExpressRequest,
-  res: ExpressResponse
+// Import your getSicCode function
+import { getSicCode } from "../utils/poly-related-api";
+import { getRandomTickersBySicCode } from "../utils/poly-related-api";
+
+export const getRandomTickersBySicCodeController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
-  const { ticker } = req.params;
-
   try {
-    const data = await getStockData(ticker);
-    res.status(200).json(data);
-    console.log(data);
-  } catch (error) {
-    if (error instanceof Error) {
-      res.status(500).json({
-        message: "Error fetching data from Polygon.io",
-        error: error.message,
-      });
-    } else {
-      res.status(500).json({
-        message: "An unknown error occurred",
-      });
+    const { sicCode } = req.params;
+
+    if (!sicCode) {
+      res.status(400).json({ error: "SIC code is required" });
+      return;
     }
+
+    const tickers = await getRandomTickersBySicCode(sicCode);
+    res.status(200).json({ sic_code: sicCode, tickers });
+  } catch (error) {
+    console.error("Error fetching random tickers by SIC code:", error);
+    res.status(500).json({
+      error: "Unable to retrieve random tickers. Please try again later.",
+    });
+  }
+};
+
+export const getSicCodeController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { ticker } = req.params;
+
+    if (!ticker) {
+      res.status(400).json({ error: "Ticker is required" });
+    }
+
+    const sicCode = await getSicCode(ticker);
+    res.status(200).json({ ticker, sic_code: sicCode });
+  } catch (error) {
+    console.error("Error fetching SIC code:", error);
+    next(error);
+    res.status(500).json({
+      error: "Unable to retrieve SIC code. Please try again later.",
+    });
+  }
+};
+
+export const getTickersBySicCodeController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { sicCode } = req.params;
+
+    if (!sicCode) {
+      res.status(400).json({ error: "SIC code is required" });
+      return;
+    }
+
+    const tickers = await getTickersBySicCode(sicCode);
+    res.status(200).json({ sic_code: sicCode, tickers });
+  } catch (error) {
+    console.error("Error fetching tickers by SIC code:", error);
+    res
+      .status(500)
+      .json({ error: "Unable to retrieve tickers. Please try again later." });
   }
 };

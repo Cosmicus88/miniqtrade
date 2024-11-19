@@ -1,5 +1,4 @@
 import { BaseSyntheticEvent, useState } from "react";
-import "./App.css";
 
 function App() {
   const [inputVal, setInputVal] = useState<string>("");
@@ -53,7 +52,7 @@ function App() {
 
   return (
     <>
-      <div>
+      <div className="text-3xl font-bold underline">
         <h1>miniqtrade</h1>
       </div>
       <form onSubmit={handleSubmit}>

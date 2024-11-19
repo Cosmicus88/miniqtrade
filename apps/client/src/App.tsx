@@ -36,7 +36,8 @@ function App() {
       // console.log(setTickers);
       // console.log("tickers", tickers);
     } catch (err) {
-      // console.error("Error fetching tickers:", err);
+      const error = err as Error;
+      console.error("Error fetching tickers:", error.message);
     }
   };
 

@@ -85,7 +85,7 @@ function App() {
           type="text"
           onChange={handleChange}
           value={inputVal}
-          placeholder="Enter Stock Ticker"
+          placeholder="Enter Exchange Code"
         />
         <Button type="submit">Scan</Button>
       </form>

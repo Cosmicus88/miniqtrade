@@ -5,6 +5,7 @@
   "license": "MIT",
   "packageManager": "yarn@1.22.22",
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "eslint-json": "^2.0.0",
     "jest": "^28.1.3",

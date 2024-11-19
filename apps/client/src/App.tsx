@@ -1,4 +1,15 @@
 import { BaseSyntheticEvent, useState } from "react";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function App() {
   const [inputVal, setInputVal] = useState<string>("");
@@ -52,30 +63,38 @@ function App() {
   };
 
   return (
-    <>
+    <div className="p-6">
       <div className="text-3xl font-bold underline">
         <h1>miniqtrade</h1>
       </div>
-      <form onSubmit={handleSubmit}>
-        <input
+      <form onSubmit={handleSubmit} className="my-8">
+        <Input
+          className="inline-block w-72 mr-2"
           type="text"
           onChange={handleChange}
           value={inputVal}
           placeholder="Enter Stock Ticker"
         />
-        <button type="submit">Scan</button>
+        <Button type="submit">Scan</Button>
       </form>
       {tickers.length > 0 && (
-        <div>
-          <h2>Random Tickers</h2>
-          <ul>
-            {tickers.map((ticker, index) => (
-              <li key={index}>{ticker}</li>
+        <Table>
+          <TableCaption>A list of random tickers.</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">Ticker</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tickers.map((ticker) => (
+              <TableRow key={ticker}>
+                <TableCell className="font-medium">{ticker}</TableCell>
+              </TableRow>
             ))}
-          </ul>
-        </div>
+          </TableBody>
+        </Table>
       )}
-    </>
+    </div>
   );
 }
 

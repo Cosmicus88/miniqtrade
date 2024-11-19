@@ -11,9 +11,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+interface TickersAPIResponse {
+  exchange: string;
+  tickers: Ticker[];
+}
+
+interface Ticker {
+  ticker: string;
+  name: string;
+  type: string;
+  market: string;
+}
+
 function App() {
   const [inputVal, setInputVal] = useState<string>("");
-  const [tickers, setTickers] = useState<string[]>([]);
+  const [tickers, setTickers] = useState<Ticker[]>([]);
 
   const fetchRandomTickers = async () => {
     try {
@@ -34,7 +46,7 @@ function App() {
       }
 
       // Parse and handle the response
-      const data = await response.json();
+      const data = (await response.json()) as TickersAPIResponse;
       // console.log("data", data);
 
       if (!data.tickers || data.tickers.length === 0) {
@@ -87,8 +99,9 @@ function App() {
           </TableHeader>
           <TableBody>
             {tickers.map((ticker) => (
-              <TableRow key={ticker}>
-                <TableCell className="font-medium">{ticker}</TableCell>
+              <TableRow key={ticker.ticker}>
+                <TableCell className="font-medium">{ticker.ticker}</TableCell>
+                <TableCell className="font-medium">{ticker.name}</TableCell>
               </TableRow>
             ))}
           </TableBody>

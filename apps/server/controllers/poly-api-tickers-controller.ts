@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { getRandomTickersFromExchange } from "../utils/polygon-api-model";
+import { getRandomTickersFromExchange } from "../utils/poly-api-tickers-model";
 
 export const getRandomTickersController = async (
   req: Request,

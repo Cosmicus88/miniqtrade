@@ -88,20 +88,65 @@ function App() {
       }
     });
   };
+  const handleFormSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-  // const handleSubmit1 = (event: React.FormEvent) => {
-  //   event.preventDefault();
+    if (selectedTickers.length !== 2) {
+      alert("Please select exactly 2 tickers.");
+      return;
+    }
 
-  //   // Validate inputs
-  //   if (!fromDate || !toDate) {
-  //     alert("Please fill out all required fields.");
-  //     return;
-  //   }
+    try {
+      // Make separate requests for each ticker
+      const responses = await Promise.all(
+        selectedTickers.map(async (ticker) => {
+          const params = {
+            ticker: ticker,
+            multiplier: multiplier,
+            timespan: timespan,
+            from: fromDate,
+            to: toDate,
+          };
 
-  //   // Pass the input data back to the parent component or handle it here
-  //   const data = { ticker, multiplier, timespan, fromDate, toDate };
-  //   onSubmit(data);
-  // };
+          const myHeaders = new Headers();
+          myHeaders.append("Content-Type", "application/json");
+
+          const requestOptions = {
+            method: "GET",
+            headers: myHeaders,
+          };
+
+          const baseUrl = "http://localhost:8080/api/stock/aggregates/prices/";
+          const url = new URL(baseUrl);
+          const queryParams = new URLSearchParams({
+            ...params,
+            multiplier: multiplier.toString(),
+          });
+          url.search = queryParams.toString();
+          const apiUrl = url.toString();
+          const response = await fetch(apiUrl, requestOptions);
+
+          if (!response.ok) {
+            throw new Error(`Error fetching data for ticker: ${ticker}`);
+          }
+
+          return await response.json(); // Parse and return JSON response
+        })
+      );
+
+      // Combine results into a displayable format
+      const formattedResults = responses.map((result, index) => ({
+        ticker: selectedTickers[index], // Map back to the corresponding ticker
+        closingPrices: result.closingPrices,
+      }));
+
+      console.log("Aggregated Closing Prices:", formattedResults);
+      // Handle displaying the results on your frontend as needed
+    } catch (error) {
+      console.error("Error fetching aggregate prices:", error);
+      alert("Failed to fetch closing prices. Please try again.");
+    }
+  };
 
   return (
     <div className="p-6">
@@ -189,21 +234,19 @@ function App() {
           ))}
         </ul>
       </div>
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        {/* <div>
-          <label htmlFor="ticker" className="block font-medium mb-2">
-            Ticker
+      <form onSubmit={handleFormSubmit} className="p-4 space-y-4">
+        <div>
+          <label htmlFor="selectedTickers" className="block font-medium mb-2">
+            Selected Tickers
           </label>
           <input
-            id="ticker"
+            id="selectedTickers"
             type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            placeholder="Enter ticker (e.g., AAPL)"
-            className="w-full p-2 border rounded"
-            required
+            value={selectedTickers.join(", ")} // Format as comma-separated values
+            readOnly
+            className="w-full p-2 border rounded bg-gray-100"
           />
-        </div> */}
+        </div>
 
         <div>
           <label htmlFor="multiplier" className="block font-medium mb-2">
@@ -248,7 +291,11 @@ function App() {
             id="fromDate"
             type="date"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            onChange={(e) => {
+              const date = new Date(e.target.value); // Convert to Date object
+              const formattedDate = date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+              setFromDate(formattedDate);
+            }}
             className="w-full p-2 border rounded"
             required
           />
@@ -262,7 +309,11 @@ function App() {
             id="toDate"
             type="date"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
+            onChange={(e) => {
+              const date = new Date(e.target.value); // Convert to Date object
+              const formattedDate = date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+              setToDate(formattedDate);
+            }}
             className="w-full p-2 border rounded"
             required
           />

@@ -7,7 +7,8 @@ export const getAggregatePriceTickerController = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { ticker, multiplier, timespan, from, to } = req.body;
+    const { ticker, multiplier, timespan, from, to } = req.query;
+    console.log("ticker=", ticker);
 
     // Validate required query parameters
     if (!ticker || !multiplier || !timespan || !from || !to) {

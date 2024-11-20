@@ -226,14 +226,7 @@ function App() {
           </TableBody>
         </Table>
       )}
-      <div className="mt-4">
-        <h4 className="font-bold">Selected Tickers:</h4>
-        <ul>
-          {selectedTickers.map((ticker) => (
-            <li key={ticker}>{ticker}</li>
-          ))}
-        </ul>
-      </div>
+
       <form onSubmit={handleFormSubmit} className="p-4 space-y-4">
         <div>
           <label htmlFor="selectedTickers" className="block font-medium mb-2">

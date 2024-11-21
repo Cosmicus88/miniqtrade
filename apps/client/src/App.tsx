@@ -3,6 +3,7 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { alignByTimestamps } from "./lib/func-alignment-time-model";
 import { calculateSpread } from "./lib/func-linear-regression-model";
+import { adfTest } from "./lib/func-adf-test-model";
 import {
   Table,
   TableBody,
@@ -162,6 +163,12 @@ function App() {
 
       const spread = calculateSpread(closingPrices1, closingPrices2);
       console.log("Calculated Spread:", spread);
+
+      const adfResult = adfTest(spread);
+
+      console.log("ADF Statistic:", adfResult.adfStatistic);
+      console.log("p-value:", adfResult.pValue);
+      console.log("Is the spread stationary?", adfResult.isStationary);
 
       // Combine results into a displayable format
       const formattedResults = responses.map((result, index) => ({

@@ -199,65 +199,6 @@ function App() {
       alert("Failed to fetch closing prices. Please try again.");
     }
   };
-  // const handleFormSubmit = async (event: React.FormEvent) => {
-  //   event.preventDefault();
-
-  //   if (selectedTickers.length !== 2) {
-  //     alert("Please select exactly 2 tickers.");
-  //     return;
-  //   }
-
-  //   try {
-  //     // Make separate requests for each ticker
-  //     const responses = await Promise.all(
-  //       selectedTickers.map(async (ticker) => {
-  //         const params = {
-  //           ticker: ticker,
-  //           multiplier: multiplier,
-  //           timespan: timespan,
-  //           from: fromDate,
-  //           to: toDate,
-  //         };
-
-  //         const myHeaders = new Headers();
-  //         myHeaders.append("Content-Type", "application/json");
-
-  //         const requestOptions = {
-  //           method: "GET",
-  //           headers: myHeaders,
-  //         };
-
-  //         const baseUrl = "http://localhost:8080/api/stock/aggregates/prices/";
-  //         const url = new URL(baseUrl);
-  //         const queryParams = new URLSearchParams({
-  //           ...params,
-  //           multiplier: multiplier.toString(),
-  //         });
-  //         url.search = queryParams.toString();
-  //         const apiUrl = url.toString();
-  //         const response = await fetch(apiUrl, requestOptions);
-
-  //         if (!response.ok) {
-  //           throw new Error(`Error fetching data for ticker: ${ticker}`);
-  //         }
-
-  //         return await response.json(); // Parse and return JSON response
-  //       })
-  //     );
-
-  //     // Combine results into a displayable format
-  //     const formattedResults = responses.map((result, index) => ({
-  //       ticker: selectedTickers[index], // Map back to the corresponding ticker
-  //       closingPrices: result.closingPrices,
-  //     }));
-
-  //     console.log("Aggregated Closing Prices:", formattedResults);
-  //     // Handle displaying the results on your frontend as needed
-  //   } catch (error) {
-  //     console.error("Error fetching aggregate prices:", error);
-  //     alert("Failed to fetch closing prices. Please try again.");
-  //   }
-  // };
 
   return (
     <div className="p-6">

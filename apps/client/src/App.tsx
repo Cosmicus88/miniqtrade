@@ -34,6 +34,14 @@ function App() {
   const [timespan, setTimespan] = useState<string>("day");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  const [closingPrices1, setClosingPrices1] = useState<number[]>([]);
+  const [closingPrices2, setClosingPrices2] = useState<number[]>([]);
+  const [spread, setSpread] = useState<number[]>([]);
+  const [adfResult, setAdfResult] = useState<{
+    adfStatistic: number;
+    pValue: number;
+    isStationary: boolean;
+  } | null>(null);
 
   const placeholderDash = Array(10).fill("");
 
@@ -153,18 +161,25 @@ function App() {
       }
 
       // Align data by shared timestamps
-      const { closingPrices1, closingPrices2 } = alignByTimestamps(
-        data1,
-        data2
-      );
+      const { closingPrices1: alignedData1, closingPrices2: alignedData2 } =
+        alignByTimestamps(data1, data2);
 
-      console.log(`Aligned Prices for ${selectedTickers[0]}:`, closingPrices1);
-      console.log(`Aligned Prices for ${selectedTickers[1]}:`, closingPrices2);
+      // Extract closing prices from the aligned data
+      const prices1 = alignedData1;
+      const prices2 = alignedData2;
 
-      const spread = calculateSpread(closingPrices1, closingPrices2);
+      setClosingPrices1(prices1);
+      setClosingPrices2(prices2);
+
+      console.log(`Aligned Prices for ${selectedTickers[0]}:`, prices1);
+      console.log(`Aligned Prices for ${selectedTickers[1]}:`, prices2);
+
+      const spread = calculateSpread(prices1, prices2);
+      setSpread(spread);
       console.log("Calculated Spread:", spread);
 
       const adfResult = adfTest(spread);
+      setAdfResult(adfResult);
 
       console.log("ADF Statistic:", adfResult.adfStatistic);
       console.log("p-value:", adfResult.pValue);
@@ -415,6 +430,50 @@ function App() {
           Fetch Aggregate Prices
         </button>
       </form>
+      <div className="mt-8">
+        <h3 className="font-bold text-lg">Results</h3>
+
+        {closingPrices1.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-medium">
+              Closing Prices for {selectedTickers[0]}:
+            </h4>
+            <p className="text-gray-700">
+              {closingPrices1.join(", ")}
+              {/* {closingPrices1.map((el) => el.c).join(", ")} */}
+            </p>
+          </div>
+        )}
+
+        {closingPrices2.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-medium">
+              Closing Prices for {selectedTickers[1]}:
+            </h4>
+            <p className="text-gray-700">{closingPrices2.join(", ")}</p>
+          </div>
+        )}
+
+        {spread.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-medium">Calculated Spread:</h4>
+            <p className="text-gray-700">{spread.join(", ")}</p>
+          </div>
+        )}
+
+        {adfResult && (
+          <div className="mt-4">
+            <h4 className="font-medium">ADF Test Results:</h4>
+            <p className="text-gray-700">
+              ADF Statistic: {adfResult.adfStatistic}
+            </p>
+            <p className="text-gray-700">p-value: {adfResult.pValue}</p>
+            <p className="text-gray-700">
+              Is the spread stationary? {adfResult.isStationary ? "Yes" : "No"}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

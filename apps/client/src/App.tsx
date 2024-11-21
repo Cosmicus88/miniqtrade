@@ -1,6 +1,8 @@
 import { BaseSyntheticEvent, useState } from "react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
+import { alignByTimestamps } from "./lib/func-alignment-time-model";
+import { calculateSpread } from "./lib/func-linear-regression-model";
 import {
   Table,
   TableBody,
@@ -97,11 +99,11 @@ function App() {
     }
 
     try {
-      // Make separate requests for each ticker
+      // Fetch data for both selected tickers
       const responses = await Promise.all(
         selectedTickers.map(async (ticker) => {
           const params = {
-            ticker: ticker,
+            ticker,
             multiplier: multiplier,
             timespan: timespan,
             from: fromDate,
@@ -111,42 +113,129 @@ function App() {
           const myHeaders = new Headers();
           myHeaders.append("Content-Type", "application/json");
 
-          const requestOptions = {
-            method: "GET",
-            headers: myHeaders,
-          };
-
           const baseUrl = "http://localhost:8080/api/stock/aggregates/prices/";
           const url = new URL(baseUrl);
           const queryParams = new URLSearchParams({
-            ...params,
-            multiplier: multiplier.toString(),
+            ticker: params.ticker,
+            multiplier: params.multiplier.toString(),
+            timespan: params.timespan,
+            from: params.from,
+            to: params.to,
           });
           url.search = queryParams.toString();
           const apiUrl = url.toString();
-          const response = await fetch(apiUrl, requestOptions);
+
+          const response = await fetch(apiUrl, {
+            method: "GET",
+            headers: myHeaders,
+          });
 
           if (!response.ok) {
             throw new Error(`Error fetching data for ticker: ${ticker}`);
           }
 
-          return await response.json(); // Parse and return JSON response
+          const jsonResponse = await response.json();
+
+          // Extract the results array containing { t, c }
+          return jsonResponse.results; // Extract only the array of results
         })
       );
+
+      console.log("Response for selected tickers:", responses);
+
+      // Extract raw data for the selected tickers
+      const [data1, data2] = responses;
+
+      // Validate that both responses are arrays
+      if (!Array.isArray(data1) || !Array.isArray(data2)) {
+        throw new Error("API did not return valid array data in 'results'");
+      }
+
+      // Align data by shared timestamps
+      const { closingPrices1, closingPrices2 } = alignByTimestamps(
+        data1,
+        data2
+      );
+
+      console.log(`Aligned Prices for ${selectedTickers[0]}:`, closingPrices1);
+      console.log(`Aligned Prices for ${selectedTickers[1]}:`, closingPrices2);
+
+      const spread = calculateSpread(closingPrices1, closingPrices2);
+      console.log("Calculated Spread:", spread);
 
       // Combine results into a displayable format
       const formattedResults = responses.map((result, index) => ({
         ticker: selectedTickers[index], // Map back to the corresponding ticker
-        closingPrices: result.closingPrices,
+        closingPrices: result.map((r: { c: number }) => r.c), // Extract closing prices from the results
       }));
 
       console.log("Aggregated Closing Prices:", formattedResults);
-      // Handle displaying the results on your frontend as needed
+
+      // Further processing or displaying results
     } catch (error) {
       console.error("Error fetching aggregate prices:", error);
       alert("Failed to fetch closing prices. Please try again.");
     }
   };
+  // const handleFormSubmit = async (event: React.FormEvent) => {
+  //   event.preventDefault();
+
+  //   if (selectedTickers.length !== 2) {
+  //     alert("Please select exactly 2 tickers.");
+  //     return;
+  //   }
+
+  //   try {
+  //     // Make separate requests for each ticker
+  //     const responses = await Promise.all(
+  //       selectedTickers.map(async (ticker) => {
+  //         const params = {
+  //           ticker: ticker,
+  //           multiplier: multiplier,
+  //           timespan: timespan,
+  //           from: fromDate,
+  //           to: toDate,
+  //         };
+
+  //         const myHeaders = new Headers();
+  //         myHeaders.append("Content-Type", "application/json");
+
+  //         const requestOptions = {
+  //           method: "GET",
+  //           headers: myHeaders,
+  //         };
+
+  //         const baseUrl = "http://localhost:8080/api/stock/aggregates/prices/";
+  //         const url = new URL(baseUrl);
+  //         const queryParams = new URLSearchParams({
+  //           ...params,
+  //           multiplier: multiplier.toString(),
+  //         });
+  //         url.search = queryParams.toString();
+  //         const apiUrl = url.toString();
+  //         const response = await fetch(apiUrl, requestOptions);
+
+  //         if (!response.ok) {
+  //           throw new Error(`Error fetching data for ticker: ${ticker}`);
+  //         }
+
+  //         return await response.json(); // Parse and return JSON response
+  //       })
+  //     );
+
+  //     // Combine results into a displayable format
+  //     const formattedResults = responses.map((result, index) => ({
+  //       ticker: selectedTickers[index], // Map back to the corresponding ticker
+  //       closingPrices: result.closingPrices,
+  //     }));
+
+  //     console.log("Aggregated Closing Prices:", formattedResults);
+  //     // Handle displaying the results on your frontend as needed
+  //   } catch (error) {
+  //     console.error("Error fetching aggregate prices:", error);
+  //     alert("Failed to fetch closing prices. Please try again.");
+  //   }
+  // };
 
   return (
     <div className="p-6">

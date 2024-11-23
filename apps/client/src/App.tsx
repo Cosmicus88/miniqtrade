@@ -1,30 +1,14 @@
-import { BaseSyntheticEvent, useState } from "react";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
+// App.tsx
+import { useState } from "react";
+import Header from "./components/Header";
+import SearchForm from "./components/SearchForm";
+import TickerTable from "./components/TickerTable";
+import FormInputs from "./components/FormInputs";
+import ResultsDisplay from "./components/ResultsDisplay";
+import { adfTest } from "./lib/func-adf-test-model";
 import { alignByTimestamps } from "./lib/func-alignment-time-model";
 import { calculateSpread } from "./lib/func-linear-regression-model";
-import { adfTest } from "./lib/func-adf-test-model";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-interface TickersAPIResponse {
-  exchange: string;
-  tickers: Ticker[];
-}
-
-interface Ticker {
-  ticker: string;
-  name: string;
-  type: string;
-  market: string;
-}
+import { Ticker } from "./components/TickerTable";
 
 function App() {
   const [inputVal, setInputVal] = useState<string>("");
@@ -43,62 +27,22 @@ function App() {
     isStationary: boolean;
   } | null>(null);
 
-  const placeholderDash = Array(10).fill("");
-
   const fetchRandomTickers = async () => {
     try {
-      const exchangeCode = inputVal.trim();
-      if (!exchangeCode) {
-        throw new Error("Exchange code cannot be empty");
-      }
+      if (!inputVal.trim()) throw new Error("Exchange code cannot be empty");
 
-      // Fetch data from the getRandomTickersBySicCodeController
       const response = await fetch(
-        `http://localhost:8080/api/stock/random/${exchangeCode}`
+        `http://localhost:8080/api/stock/random/${inputVal.trim()}`
       );
-      console.log("response", response);
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status} ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`Error: ${response.status}`);
 
-      // Parse and handle the response
-      const data = (await response.json()) as TickersAPIResponse;
-      if (!data.tickers || data.tickers.length === 0) {
-        throw new Error(`No tickers found for exchange code ${exchangeCode}`);
-      }
-
-      setTickers(data.tickers);
+      const data = await response.json();
+      setTickers(data.tickers || []);
     } catch (err) {
-      const error = err as Error;
-      console.error("Error fetching tickers:", error.message);
+      console.error("Error fetching tickers:", err);
     }
   };
 
-  const handleSubmit = (event: BaseSyntheticEvent) => {
-    event.preventDefault();
-    console.log("Form submitted with value: ", inputVal);
-    fetchRandomTickers();
-  };
-
-  const handleChange = (event: BaseSyntheticEvent) => {
-    setInputVal(event.target.value);
-  };
-
-  const handleCheckboxChange = (ticker: string) => {
-    setSelectedTickers((prev) => {
-      if (prev.includes(ticker)) {
-        // Deselect ticker
-        return prev.filter((t) => t !== ticker);
-      } else if (prev.length < 2) {
-        // Add ticker if less than 2 selected
-        return [...prev, ticker];
-      } else {
-        // Do not allow more than 2 selections
-        alert("You can only select up to 2 rows at a time.");
-        return prev;
-      }
-    });
-  };
   const handleFormSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -108,315 +52,632 @@ function App() {
     }
 
     try {
-      // Fetch data for both selected tickers
       const responses = await Promise.all(
         selectedTickers.map(async (ticker) => {
-          const params = {
+          const queryParams = new URLSearchParams({
             ticker,
-            multiplier: multiplier,
-            timespan: timespan,
+            multiplier: multiplier.toString(),
+            timespan,
             from: fromDate,
             to: toDate,
-          };
-
-          const myHeaders = new Headers();
-          myHeaders.append("Content-Type", "application/json");
-
-          const baseUrl = "http://localhost:8080/api/stock/aggregates/prices/";
-          const url = new URL(baseUrl);
-          const queryParams = new URLSearchParams({
-            ticker: params.ticker,
-            multiplier: params.multiplier.toString(),
-            timespan: params.timespan,
-            from: params.from,
-            to: params.to,
           });
-          url.search = queryParams.toString();
-          const apiUrl = url.toString();
-
-          const response = await fetch(apiUrl, {
-            method: "GET",
-            headers: myHeaders,
-          });
-
-          if (!response.ok) {
-            throw new Error(`Error fetching data for ticker: ${ticker}`);
-          }
-
-          const jsonResponse = await response.json();
-
-          // Extract the results array containing { t, c }
-          return jsonResponse.results; // Extract only the array of results
+          const apiUrl = `http://localhost:8080/api/stock/aggregates/prices/?${queryParams}`;
+          const response = await fetch(apiUrl);
+          if (!response.ok)
+            throw new Error(`Error fetching data for ${ticker}`);
+          return (await response.json()).results;
         })
       );
 
-      console.log("Response for selected tickers:", responses);
-
-      // Extract raw data for the selected tickers
       const [data1, data2] = responses;
-
-      // Validate that both responses are arrays
-      if (!Array.isArray(data1) || !Array.isArray(data2)) {
-        throw new Error("API did not return valid array data in 'results'");
-      }
-
-      // Align data by shared timestamps
-      const { closingPrices1: alignedData1, closingPrices2: alignedData2 } =
+      const { closingPrices1: aligned1, closingPrices2: aligned2 } =
         alignByTimestamps(data1, data2);
 
-      // Extract closing prices from the aligned data
-      const prices1 = alignedData1;
-      const prices2 = alignedData2;
+      setClosingPrices1(aligned1);
+      setClosingPrices2(aligned2);
 
-      setClosingPrices1(prices1);
-      setClosingPrices2(prices2);
+      const calculatedSpread = calculateSpread(aligned1, aligned2);
+      setSpread(calculatedSpread);
 
-      console.log(`Aligned Prices for ${selectedTickers[0]}:`, prices1);
-      console.log(`Aligned Prices for ${selectedTickers[1]}:`, prices2);
-
-      const spread = calculateSpread(prices1, prices2);
-      setSpread(spread);
-      console.log("Calculated Spread:", spread);
-
-      const adfResult = adfTest(spread);
-      setAdfResult(adfResult);
-
-      console.log("ADF Statistic:", adfResult.adfStatistic);
-      console.log("p-value:", adfResult.pValue);
-      console.log("Is the spread stationary?", adfResult.isStationary);
-
-      // Combine results into a displayable format
-      const formattedResults = responses.map((result, index) => ({
-        ticker: selectedTickers[index], // Map back to the corresponding ticker
-        closingPrices: result.map((r: { c: number }) => r.c), // Extract closing prices from the results
-      }));
-
-      console.log("Aggregated Closing Prices:", formattedResults);
-
-      // Further processing or displaying results
-    } catch (error) {
-      console.error("Error fetching aggregate prices:", error);
-      alert("Failed to fetch closing prices. Please try again.");
+      const adf = adfTest(calculatedSpread);
+      setAdfResult(adf);
+    } catch (err) {
+      console.error("Error:", err);
     }
   };
 
   return (
     <div className="p-6">
-      <div className="text-3xl font-bold underline">
-        <h1>miniqtrade</h1>
-      </div>
+      <Header />
       <h3 className="my-8">Search Potential Candidates by Exchange</h3>
-      <form onSubmit={handleSubmit} className="my-2">
-        <Input
-          className="inline-block w-72 mr-2"
-          type="text"
-          onChange={handleChange}
-          value={inputVal}
-          placeholder="Enter Exchange Code"
-        />
-        <Button type="submit">Scan</Button>
-      </form>
-      {tickers.length === 0 && (
-        <Table>
-          <TableCaption>
-            A list of 10 random stock tickers in a pool of 1000 stock tickers of
-            a given exchange
-          </TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Ticker</TableHead>
-              <TableHead className="w-[100px]">Name</TableHead>
-              <TableHead className="w-[100px]">Asset Type</TableHead>
-              <TableHead className="w-[100px]">Market Type</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {placeholderDash.map((_, i) => (
-              <TableRow key={i}>
-                <TableCell className="font-medium">{"-"}</TableCell>
-                <TableCell className="font-medium">{"-"}</TableCell>
-                <TableCell className="font-medium">{"-"}</TableCell>
-                <TableCell className="font-medium">{"-"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      {tickers.length > 0 && (
-        <Table>
-          <TableCaption>
-            A list of 10 random stock tickers in a pool of 1000 stock tickers of
-            a given exchange
-          </TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">Select</TableHead>
-              <TableHead className="w-[100px]">Ticker</TableHead>
-              <TableHead className="w-[100px]">Name</TableHead>
-              <TableHead className="w-[100px]">Asset Type</TableHead>
-              <TableHead className="w-[100px]">Market Type</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tickers.map((ticker) => (
-              <TableRow key={ticker.ticker}>
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    className="form-checkbox"
-                    value={ticker.ticker}
-                    checked={selectedTickers.includes(ticker.ticker)}
-                    onChange={() => handleCheckboxChange(ticker.ticker)}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{ticker.ticker}</TableCell>
-                <TableCell className="font-medium">{ticker.name}</TableCell>
-                <TableCell className="font-medium">{ticker.type}</TableCell>
-                <TableCell className="font-medium">{ticker.market}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-
-      <form onSubmit={handleFormSubmit} className="p-4 space-y-4">
-        <div>
-          <label htmlFor="selectedTickers" className="block font-medium mb-2">
-            Selected Tickers
-          </label>
-          <input
-            id="selectedTickers"
-            type="text"
-            value={selectedTickers.join(", ")} // Format as comma-separated values
-            readOnly
-            className="w-full p-2 border rounded bg-gray-100"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="multiplier" className="block font-medium mb-2">
-            Multiplier
-          </label>
-          <input
-            id="multiplier"
-            type="number"
-            value={multiplier}
-            onChange={(e) => setMultiplier(Number(e.target.value))}
-            min="1"
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="timespan" className="block font-medium mb-2">
-            Timespan
-          </label>
-          <select
-            id="timespan"
-            value={timespan}
-            onChange={(e) => setTimespan(e.target.value)}
-            className="w-full p-2 border rounded"
-            required
-          >
-            <option value="second">Second</option>
-            <option value="minute">Minute</option>
-            <option value="hour">Hour</option>
-            <option value="day">Day</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="fromDate" className="block font-medium mb-2">
-            From
-          </label>
-          <input
-            id="fromDate"
-            type="date"
-            value={fromDate}
-            onChange={(e) => {
-              const date = new Date(e.target.value); // Convert to Date object
-              const formattedDate = date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
-              setFromDate(formattedDate);
-            }}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="toDate" className="block font-medium mb-2">
-            To
-          </label>
-          <input
-            id="toDate"
-            type="date"
-            value={toDate}
-            onChange={(e) => {
-              const date = new Date(e.target.value); // Convert to Date object
-              const formattedDate = date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
-              setToDate(formattedDate);
-            }}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="w-full p-2 bg-blue-600 text-white rounded"
-        >
-          Fetch Aggregate Prices
-        </button>
-      </form>
-      <div className="mt-8">
-        <h3 className="font-bold text-lg">Results</h3>
-
-        {closingPrices1.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium">
-              Closing Prices for {selectedTickers[0]}:
-            </h4>
-            <p className="text-gray-700">
-              {closingPrices1.join(", ")}
-              {/* {closingPrices1.map((el) => el.c).join(", ")} */}
-            </p>
-          </div>
-        )}
-
-        {closingPrices2.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium">
-              Closing Prices for {selectedTickers[1]}:
-            </h4>
-            <p className="text-gray-700">{closingPrices2.join(", ")}</p>
-          </div>
-        )}
-
-        {spread.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium">Calculated Spread:</h4>
-            <p className="text-gray-700">{spread.join(", ")}</p>
-          </div>
-        )}
-
-        {adfResult && (
-          <div className="mt-4">
-            <h4 className="font-medium">ADF Test Results:</h4>
-            <p className="text-gray-700">
-              ADF Statistic: {adfResult.adfStatistic}
-            </p>
-            <p className="text-gray-700">p-value: {adfResult.pValue}</p>
-            <p className="text-gray-700">
-              Is the spread stationary? {adfResult.isStationary ? "Yes" : "No"}
-            </p>
-          </div>
-        )}
-      </div>
+      <SearchForm
+        inputVal={inputVal}
+        onChange={(e) => setInputVal(e.target.value)}
+        onSubmit={(e) => {
+          e.preventDefault();
+          fetchRandomTickers();
+        }}
+      />
+      <TickerTable
+        tickers={tickers}
+        selectedTickers={selectedTickers}
+        onCheckboxChange={(ticker) =>
+          setSelectedTickers((prev) =>
+            prev.includes(ticker)
+              ? prev.filter((t) => t !== ticker)
+              : prev.length < 2
+                ? [...prev, ticker]
+                : (alert("You can select up to 2 tickers only"), prev)
+          )
+        }
+      />
+      <FormInputs
+        selectedTickers={selectedTickers}
+        multiplier={multiplier}
+        timespan={timespan}
+        fromDate={fromDate}
+        toDate={toDate}
+        onMultiplierChange={setMultiplier}
+        onTimespanChange={setTimespan}
+        onFromDateChange={setFromDate}
+        onToDateChange={setToDate}
+        onSubmit={handleFormSubmit}
+      />
+      <ResultsDisplay
+        selectedTickers={selectedTickers}
+        closingPrices1={closingPrices1}
+        closingPrices2={closingPrices2}
+        spread={spread}
+        adfResult={adfResult}
+      />
     </div>
   );
 }
 
 export default App;
+
+// import { BaseSyntheticEvent, useState } from "react";
+// import { Button } from "./components/ui/button";
+// import { Input } from "./components/ui/input";
+// import { alignByTimestamps } from "./lib/func-alignment-time-model";
+// import { calculateSpread } from "./lib/func-linear-regression-model";
+// import { adfTest } from "./lib/func-adf-test-model";
+// import {
+//   Table,
+//   TableBody,
+//   TableCaption,
+//   TableCell,
+//   TableHead,
+//   TableHeader,
+//   TableRow,
+// } from "@/components/ui/table";
+
+// interface TickersAPIResponse {
+//   exchange: string;
+//   tickers: Ticker[];
+// }
+
+// interface Ticker {
+//   ticker: string;
+//   name: string;
+//   type: string;
+//   market: string;
+// }
+
+// function App() {
+//   const [inputVal, setInputVal] = useState<string>("");
+//   const [tickers, setTickers] = useState<Ticker[]>([]);
+//   const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
+//   const [multiplier, setMultiplier] = useState<number>(1);
+//   const [timespan, setTimespan] = useState<string>("day");
+//   const [fromDate, setFromDate] = useState<string>("");
+//   const [toDate, setToDate] = useState<string>("");
+//   const [closingPrices1, setClosingPrices1] = useState<number[]>([]);
+//   const [closingPrices2, setClosingPrices2] = useState<number[]>([]);
+//   const [spread, setSpread] = useState<number[]>([]);
+//   const [adfResult, setAdfResult] = useState<{
+//     adfStatistic: number;
+//     pValue: number;
+//     isStationary: boolean;
+//   } | null>(null);
+
+//   const placeholderDash = Array(10).fill("");
+
+//   const fetchRandomTickers = async () => {
+//     try {
+//       const exchangeCode = inputVal.trim();
+//       if (!exchangeCode) {
+//         throw new Error("Exchange code cannot be empty");
+//       }
+
+//       // Fetch data from the getRandomTickersBySicCodeController
+//       const response = await fetch(
+//         `http://localhost:8080/api/stock/random/${exchangeCode}`
+//       );
+//       console.log("response", response);
+//       if (!response.ok) {
+//         throw new Error(`Error: ${response.status} ${response.statusText}`);
+//       }
+
+//       // Parse and handle the response
+//       const data = (await response.json()) as TickersAPIResponse;
+//       if (!data.tickers || data.tickers.length === 0) {
+//         throw new Error(`No tickers found for exchange code ${exchangeCode}`);
+//       }
+
+//       setTickers(data.tickers);
+//     } catch (err) {
+//       const error = err as Error;
+//       console.error("Error fetching tickers:", error.message);
+//     }
+//   };
+
+//   const handleSubmit = (event: BaseSyntheticEvent) => {
+//     event.preventDefault();
+//     console.log("Form submitted with value: ", inputVal);
+//     fetchRandomTickers();
+//   };
+
+//   const handleChange = (event: BaseSyntheticEvent) => {
+//     setInputVal(event.target.value);
+//   };
+
+//   const handleCheckboxChange = (ticker: string) => {
+//     setSelectedTickers((prev) => {
+//       if (prev.includes(ticker)) {
+//         // Deselect ticker
+//         return prev.filter((t) => t !== ticker);
+//       } else if (prev.length < 2) {
+//         // Add ticker if less than 2 selected
+//         return [...prev, ticker];
+//       } else {
+//         // Do not allow more than 2 selections
+//         alert("You can only select up to 2 rows at a time.");
+//         return prev;
+//       }
+//     });
+//   };
+//   const handleFormSubmit = async (event: React.FormEvent) => {
+//     event.preventDefault();
+
+//     if (selectedTickers.length !== 2) {
+//       alert("Please select exactly 2 tickers.");
+//       return;
+//     }
+
+//     try {
+//       // Fetch data for both selected tickers
+//       const responses = await Promise.all(
+//         selectedTickers.map(async (ticker) => {
+//           const params = {
+//             ticker,
+//             multiplier: multiplier,
+//             timespan: timespan,
+//             from: fromDate,
+//             to: toDate,
+//           };
+
+//           const myHeaders = new Headers();
+//           myHeaders.append("Content-Type", "application/json");
+
+//           const baseUrl = "http://localhost:8080/api/stock/aggregates/prices/";
+//           const url = new URL(baseUrl);
+//           const queryParams = new URLSearchParams({
+//             ticker: params.ticker,
+//             multiplier: params.multiplier.toString(),
+//             timespan: params.timespan,
+//             from: params.from,
+//             to: params.to,
+//           });
+//           url.search = queryParams.toString();
+//           const apiUrl = url.toString();
+
+//           const response = await fetch(apiUrl, {
+//             method: "GET",
+//             headers: myHeaders,
+//           });
+
+//           if (!response.ok) {
+//             throw new Error(`Error fetching data for ticker: ${ticker}`);
+//           }
+
+//           const jsonResponse = await response.json();
+
+//           // Extract the results array containing { t, c }
+//           return jsonResponse.results; // Extract only the array of results
+//         })
+//       );
+
+//       console.log("Response for selected tickers:", responses);
+
+//       // Extract raw data for the selected tickers
+//       const [data1, data2] = responses;
+
+//       // Validate that both responses are arrays
+//       if (!Array.isArray(data1) || !Array.isArray(data2)) {
+//         throw new Error("API did not return valid array data in 'results'");
+//       }
+
+//       // Align data by shared timestamps
+//       const { closingPrices1: alignedData1, closingPrices2: alignedData2 } =
+//         alignByTimestamps(data1, data2);
+
+//       // Extract closing prices from the aligned data
+//       const prices1 = alignedData1;
+//       const prices2 = alignedData2;
+
+//       setClosingPrices1(prices1);
+//       setClosingPrices2(prices2);
+
+//       console.log(`Aligned Prices for ${selectedTickers[0]}:`, prices1);
+//       console.log(`Aligned Prices for ${selectedTickers[1]}:`, prices2);
+
+//       const spread = calculateSpread(prices1, prices2);
+//       setSpread(spread);
+//       console.log("Calculated Spread:", spread);
+
+//       const adfResult = adfTest(spread);
+//       setAdfResult(adfResult);
+
+//       console.log("ADF Statistic:", adfResult.adfStatistic);
+//       console.log("p-value:", adfResult.pValue);
+//       console.log("Is the spread stationary?", adfResult.isStationary);
+
+//       // Combine results into a displayable format
+//       const formattedResults = responses.map((result, index) => ({
+//         ticker: selectedTickers[index], // Map back to the corresponding ticker
+//         closingPrices: result.map((r: { c: number }) => r.c), // Extract closing prices from the results
+//       }));
+
+//       console.log("Aggregated Closing Prices:", formattedResults);
+
+//       // Further processing or displaying results
+//     } catch (error) {
+//       console.error("Error fetching aggregate prices:", error);
+//       alert("Failed to fetch closing prices. Please try again.");
+//     }
+//   };
+
+//   return (
+//     <div className="p-6">
+//       <div className="text-3xl font-bold underline">
+//         <h1>miniqtrade</h1>
+//       </div>
+//       <h3 className="my-8">Search Potential Candidates by Exchange</h3>
+//       <form onSubmit={handleSubmit} className="my-2">
+//         <Input
+//           className="inline-block w-72 mr-2"
+//           type="text"
+//           onChange={handleChange}
+//           value={inputVal}
+//           placeholder="Enter Exchange Code"
+//         />
+//         <Button type="submit">Scan</Button>
+//       </form>
+//       {tickers.length === 0 && (
+//         <Table>
+//           <TableCaption>
+//             A list of 10 random stock tickers in a pool of 1000 stock tickers of
+//             a given exchange
+//           </TableCaption>
+//           <TableHeader>
+//             <TableRow>
+//               <TableHead className="w-[100px]">Ticker</TableHead>
+//               <TableHead className="w-[100px]">Name</TableHead>
+//               <TableHead className="w-[100px]">Asset Type</TableHead>
+//               <TableHead className="w-[100px]">Market Type</TableHead>
+//             </TableRow>
+//           </TableHeader>
+//           <TableBody>
+//             {placeholderDash.map((_, i) => (
+//               <TableRow key={i}>
+//                 <TableCell className="font-medium">{"-"}</TableCell>
+//                 <TableCell className="font-medium">{"-"}</TableCell>
+//                 <TableCell className="font-medium">{"-"}</TableCell>
+//                 <TableCell className="font-medium">{"-"}</TableCell>
+//               </TableRow>
+//             ))}
+//           </TableBody>
+//         </Table>
+//       )}
+//       {tickers.length > 0 && (
+//         <Table>
+//           <TableCaption>
+//             A list of 10 random stock tickers in a pool of 1000 stock tickers of
+//             a given exchange
+//           </TableCaption>
+//           <TableHeader>
+//             <TableRow>
+//               <TableHead className="w-[50px]">Select</TableHead>
+//               <TableHead className="w-[100px]">Ticker</TableHead>
+//               <TableHead className="w-[100px]">Name</TableHead>
+//               <TableHead className="w-[100px]">Asset Type</TableHead>
+//               <TableHead className="w-[100px]">Market Type</TableHead>
+//             </TableRow>
+//           </TableHeader>
+//           <TableBody>
+//             {tickers.map((ticker) => (
+//               <TableRow key={ticker.ticker}>
+//                 <TableCell>
+//                   <input
+//                     type="checkbox"
+//                     className="form-checkbox"
+//                     value={ticker.ticker}
+//                     checked={selectedTickers.includes(ticker.ticker)}
+//                     onChange={() => handleCheckboxChange(ticker.ticker)}
+//                   />
+//                 </TableCell>
+//                 <TableCell className="font-medium">{ticker.ticker}</TableCell>
+//                 <TableCell className="font-medium">{ticker.name}</TableCell>
+//                 <TableCell className="font-medium">{ticker.type}</TableCell>
+//                 <TableCell className="font-medium">{ticker.market}</TableCell>
+//               </TableRow>
+//             ))}
+//           </TableBody>
+//         </Table>
+//       )}
+
+//       <form onSubmit={handleFormSubmit} className="p-4 space-y-4">
+//         <div>
+//           <label htmlFor="selectedTickers" className="block font-medium mb-2">
+//             Selected Tickers
+//           </label>
+//           <input
+//             id="selectedTickers"
+//             type="text"
+//             value={selectedTickers.join(", ")} // Format as comma-separated values
+//             readOnly
+//             className="w-full p-2 border rounded bg-gray-100"
+//           />
+//         </div>
+
+//         <div>
+//           <label htmlFor="multiplier" className="block font-medium mb-2">
+//             Multiplier
+//           </label>
+//           <input
+//             id="multiplier"
+//             type="number"
+//             value={multiplier}
+//             onChange={(e) => setMultiplier(Number(e.target.value))}
+//             min="1"
+//             className="w-full p-2 border rounded"
+//             required
+//           />
+//         </div>
+
+//         <div>
+//           <label htmlFor="timespan" className="block font-medium mb-2">
+//             Timespan
+//           </label>
+//           <select
+//             id="timespan"
+//             value={timespan}
+//             onChange={(e) => setTimespan(e.target.value)}
+//             className="w-full p-2 border rounded"
+//             required
+//           >
+//             <option value="second">Second</option>
+//             <option value="minute">Minute</option>
+//             <option value="hour">Hour</option>
+//             <option value="day">Day</option>
+//             <option value="week">Week</option>
+//             <option value="month">Month</option>
+//           </select>
+//         </div>
+
+//         <div>
+//           <label htmlFor="fromDate" className="block font-medium mb-2">
+//             From
+//           </label>
+//           <input
+//             id="fromDate"
+//             type="date"
+//             value={fromDate}
+//             onChange={(e) => {
+//               const date = new Date(e.target.value); // Convert to Date object
+//               const formattedDate = date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+//               setFromDate(formattedDate);
+//             }}
+//             className="w-full p-2 border rounded"
+//             required
+//           />
+//         </div>
+
+//         <div>
+//           <label htmlFor="toDate" className="block font-medium mb-2">
+//             To
+//           </label>
+//           <input
+//             id="toDate"
+//             type="date"
+//             value={toDate}
+//             onChange={(e) => {
+//               const date = new Date(e.target.value); // Convert to Date object
+//               const formattedDate = date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+//               setToDate(formattedDate);
+//             }}
+//             className="w-full p-2 border rounded"
+//             required
+//           />
+//         </div>
+
+//         <button
+//           type="submit"
+//           className="w-full p-2 bg-blue-600 text-white rounded"
+//         >
+//           Fetch Aggregate Prices
+//         </button>
+//       </form>
+//       <div className="mt-8">
+//         <h3 className="font-bold text-lg">Results</h3>
+
+//         {closingPrices1.length > 0 && (
+//           <div className="mt-4">
+//             <h4 className="font-medium">
+//               Closing Prices for {selectedTickers[0]}:
+//             </h4>
+//             <p className="text-gray-700">
+//               {closingPrices1.join(", ")}
+//               {/* {closingPrices1.map((el) => el.c).join(", ")} */}
+//             </p>
+//           </div>
+//         )}
+
+//         {closingPrices2.length > 0 && (
+//           <div className="mt-4">
+//             <h4 className="font-medium">
+//               Closing Prices for {selectedTickers[1]}:
+//             </h4>
+//             <p className="text-gray-700">{closingPrices2.join(", ")}</p>
+//           </div>
+//         )}
+
+//         {spread.length > 0 && (
+//           <div className="mt-4">
+//             <h4 className="font-medium">Calculated Spread:</h4>
+//             <p className="text-gray-700">{spread.join(", ")}</p>
+//           </div>
+//         )}
+
+//         {adfResult && (
+//           <div className="mt-4">
+//             <h4 className="font-medium">ADF Test Results:</h4>
+//             <p className="text-gray-700">
+//               ADF Statistic: {adfResult.adfStatistic}
+//             </p>
+//             <p className="text-gray-700">p-value: {adfResult.pValue}</p>
+//             <p className="text-gray-700">
+//               Is the spread stationary? {adfResult.isStationary ? "Yes" : "No"}
+//             </p>
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
+// import {
+//   Card,
+//   CardContent,
+//   CardDescription,
+//   CardHeader,
+//   CardTitle,
+// } from "@/components/ui/card";
+// import {
+//   ChartConfig,
+//   ChartContainer,
+//   ChartTooltip,
+//   ChartTooltipContent,
+// } from "@/components/ui/chart";
+
+// const chartConfig = {
+//   views: {
+//     label: "Page Views",
+//   },
+//   desktop: {
+//     label: "Desktop",
+//     color: "hsl(var(--chart-1))",
+//   },
+//   mobile: {
+//     label: "Mobile",
+//     color: "hsl(var(--chart-2))",
+//   },
+// } satisfies ChartConfig
+// export function Component() {
+//   const [activeChart, setActiveChart] =
+//     React.useState<keyof typeof chartConfig>("desktop")
+//   const total = React.useMemo(
+//     () => ({
+//       desktop: chartData.reduce((acc, curr) => acc + curr.desktop, 0),
+//       mobile: chartData.reduce((acc, curr) => acc + curr.mobile, 0),
+//     }),
+//     []
+//   )
+
+// <Card>
+//   <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
+//     <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
+//       <CardTitle>Line Chart - Interactive</CardTitle>
+//       <CardDescription>
+//         Showing total visitors for the last 3 months
+//       </CardDescription>
+//     </div>
+//     <div className="flex">
+//       {["desktop", "mobile"].map((key) => {
+//         const chart = key as keyof typeof chartConfig;
+//         return (
+//           <button
+//             key={chart}
+//             data-active={activeChart === chart}
+//             className="flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left even:border-l data-[active=true]:bg-muted/50 sm:border-l sm:border-t-0 sm:px-8 sm:py-6"
+//             onClick={() => setActiveChart(chart)}
+//           >
+//             <span className="text-xs text-muted-foreground">
+//               {chartConfig[chart].label}
+//             </span>
+//             <span className="text-lg font-bold leading-none sm:text-3xl">
+//               {total[key as keyof typeof total].toLocaleString()}
+//             </span>
+//           </button>
+//         );
+//       })}
+//     </div>
+//   </CardHeader>
+//   <CardContent className="px-2 sm:p-6">
+//     <ChartContainer
+//       config={chartConfig}
+//       className="aspect-auto h-[250px] w-full"
+//     >
+//       <LineChart
+//         accessibilityLayer
+//         data={chartData}
+//         margin={{
+//           left: 12,
+//           right: 12,
+//         }}
+//       >
+//         <CartesianGrid vertical={false} />
+//         <XAxis
+//           dataKey="date"
+//           tickLine={false}
+//           axisLine={false}
+//           tickMargin={8}
+//           minTickGap={32}
+//           tickFormatter={(value) => {
+//             const date = new Date(value);
+//             return date.toLocaleDateString("en-US", {
+//               month: "short",
+//               day: "numeric",
+//             });
+//           }}
+//         />
+//         <ChartTooltip
+//           content={
+//             <ChartTooltipContent
+//               className="w-[150px]"
+//               nameKey="views"
+//               labelFormatter={(value) => {
+//                 return new Date(value).toLocaleDateString("en-US", {
+//                   month: "short",
+//                   day: "numeric",
+//                   year: "numeric",
+//                 });
+//               }}
+//             />
+//           }
+//         />
+//         <Line
+//           dataKey={activeChart}
+//           type="monotone"
+//           stroke={`var(--color-${activeChart})`}
+//           strokeWidth={2}
+//           dot={false}
+//         />
+//       </LineChart>
+//     </ChartContainer>
+//   </CardContent>
+// </Card>;
